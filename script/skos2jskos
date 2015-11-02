@@ -1,0 +1,300 @@
+#!/usr/bin/env perl
+use v5.14;
+
+our $VERSION = '0.1.0';
+
+use List::Util qw(any);
+
+## get options
+use Getopt::Long;
+use Pod::Usage;
+
+my %opt;
+GetOptions(
+    \%opt,           'help|h|?', 'sparql=s',     'scheme=s',
+    'directory|d=s', 'name|n=s', 'language|l=s', 'quiet|q',
+    'verbose|v',     'version',
+) or exit 1;
+say "skos2jskos $VERSION" and exit if $opt{version};
+if ( $opt{help} or ( !$opt{sparql} && !@ARGV ) ) {
+    pod2usage( -exitval => 1, -indent => 2 );
+}
+
+$opt{directory} //= '.';
+$opt{directory} =~ s{/$}{};
+die "output directory not found: " . $opt{directory} . "\n"
+  unless -d $opt{directory};
+
+$opt{language} //= 'en';
+
+## Logging methods
+use Term::ANSIColor;
+my $colored = -t STDOUT;    ## no critic
+
+sub error($) {              ## no critic
+    say STDERR ( $colored ? colored( $_[0], 'red' ) : $_[0] );
+}
+
+sub fatal($) {              ## no critic
+    error(@_);
+    exit 1;
+}
+
+sub warning($) {            ## no critic
+    say STDERR ( $colored ? colored( $_[0], 'yellow' ) : $_[0] );
+}
+
+sub info($) {               ## no critic
+    return if $opt{quiet};
+    say STDERR ( $colored ? colored( $_[0], 'green' ) : $_[0] );
+}
+
+sub trace($) {              ## no critic
+    return unless $opt{verbose};
+    say STDERR ( $colored ? colored( $_[0], 'white' ) : $_[0] );
+}
+
+## check where to get RDF data from
+use RDF::Trine;
+use RDF::Query;
+use RDF::Query::Client;
+
+my $source = $opt{sparql} || RDF::Trine::Model->new;
+
+if ( $opt{sparql} ) {
+    info "Getting RDF from SPARQL endpoint " . $opt{sparql};
+}
+elsif ( $ARGV[0] =~ qr{^https?://} ) {
+    info "Reading RDF from $ARGV[0]";
+    RDF::Trine->default_useragent->ssl_opts( verify_hostname => 0 );
+    RDF::Trine::Parser->parse_url_into_model( $ARGV[0], $source );
+    trace $source->size . " triples";
+}
+else {
+    info "Reading RDF files";
+    my $size = 0;
+    foreach my $file (@ARGV) {
+        my $parser = RDF::Trine::Parser->guess_parser_by_filename($file);
+        $parser->parse_file_into_model( "file://$file", $file, $source );
+        trace $source->size - $size . " triples from $file";
+        $size = $source->size;
+    }
+}
+
+### SPARQL query method
+sub sparql {
+    my ($query) = @_;
+
+    $query = <<'SPARQL'. $query . "\n}";
+PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+PREFIX dct: <http://purl.org/dc/terms/>
+SELECT * WHERE {
+SPARQL
+
+    #    trace $query;
+
+    my $q =
+      $opt{sparql}
+      ? RDF::Query::Client->new($query)
+      : RDF::Query->new($query);
+
+    $q->execute($source) // RDF::Trine::Iterator->new( [], 'bindings', [] );
+}
+
+## Conversion methods
+sub prefLabel {
+    my ( $entity, $label ) = @_;
+    return unless $label;
+    my $language = $label->literal_value_language // $opt{language};
+    my $value = $label->literal_value;
+    if ( ( $entity->{prefLabel}->{$language} // $value ) ne $value ) {
+        warning "multiple prefLabel\@$language for " . $entity->{uri};
+    }
+    $entity->{prefLabel}->{$language} = $value;
+}
+
+sub pushUnique {
+    my ( $list, $value ) = @_;
+    return if any { $_ eq $value } @$list;
+    push @$list, $value;
+}
+
+sub uriList {
+    my ( $entity, $property, $node ) = @_;
+    return unless $node;
+    pushUnique( $entity->{$property} //= [], $node->uri_value );
+}
+
+sub notation {
+    my ( $entity, $label ) = @_;
+    return unless $label;
+    pushUnique( $entity->{notation} //= [], $label->literal_value );
+}
+
+## Export JSKOS method
+use JSON;
+my $JSON = JSON->new->pretty->utf8->canonical;
+
+sub export {
+    my ( $file, $jskos ) = @_;
+    $file = $opt{name} . "-$file" if defined $opt{name};
+    $file = $opt{directory} . '/' . $file;
+    open my $fh, '>', $file;
+    say $fh $JSON->encode($jskos);
+    trace $file;
+}
+
+## convert concept scheme
+unless ( $opt{scheme} ) {
+    my @schemes = sparql('?s a skos:ConceptScheme .')->get_all;
+    fatal "RDF contains no skos:ConceptScheme" unless @schemes;
+    if ( @schemes > 1 ) {
+        error "Please choose a concept scheme with option --scheme:";
+        say $_->{s}->uri_value for @schemes;
+        exit 1;
+    }
+    $opt{scheme} = $schemes[0]->{s}->uri_value;
+}
+
+info "Converting concept scheme $opt{scheme}";
+
+my $scheme = {
+    '@context' => 'https://gbv.github.io/jskos/context.json',
+    uri        => $opt{scheme},
+    type       => ['http://www.w3.org/2004/02/skos/core#ConceptScheme'],
+};
+
+my $res = sparql("<$opt{scheme}> dct:title ?t .");
+$res->each( sub { prefLabel( $scheme, $_[0]->{t} ) } );
+
+$res = sparql("<$opt{scheme}> skos:hasTopConcept ?c .");
+$res->each( sub { uriList( $scheme, 'topConcepts', $_[0]->{c} ) } );
+$scheme->{topConcepts} = [ sort @{ $scheme->{topConcepts} } ]
+  if $scheme->{topConcepts};
+
+# TODO:
+# - dc:creator, dct:creator
+# - dct:licence
+# - dct:description
+# - notation
+# - altLabel
+
+info "Exporting JSKOS scheme";
+export( 'scheme.json', $scheme );
+
+## convert concepts
+info "Converting concepts";
+
+my $concepts = {};
+
+# TODO: just all concepts instead of inScheme
+# TODO: broader, altLabel etc.
+my $res = sparql(<<SPARQL);
+?c skos:inScheme <$opt{scheme}> .
+OPTIONAL { ?c skos:prefLabel ?pLabel } .
+OPTIONAL { ?c skos:notation ?notation } .
+OPTIONAL { ?c skos:narrower ?narrower } .
+SPARQL
+$res->each(
+    sub {
+        my $row = shift;
+        my $uri = $row->{c}->uri_value;
+
+        unless ( defined $concepts->{$uri} ) {
+            trace "$uri";
+            $concepts->{$uri} = {
+                uri  => $uri,
+                type => ['http://www.w3.org/2004/02/skos/core#Concept'],
+            };
+        }
+
+        my $concept = $concepts->{$uri};
+
+        notation( $concept, $row->{notation} );
+        prefLabel( $concept, $row->{pLabel} );
+        uriList( $concept, 'narrower', $row->{narrower} );
+    }
+);
+
+info "Exporting " . scalar( values %$concepts ) . " JSKOS concepts";
+export( 'concepts.json', [ map { $concepts->{$_} } sort keys %$concepts ] );
+
+__END__
+
+=head1 NAME
+
+skos2jskos - convert SKOS/RDF to JSKOS
+
+=head1 SYNOPSIS
+
+  skos2jskos OPTIONS [ FILES | URL ]
+
+=head1 USAGE
+
+This script can be used to convert SKOS data from a local RDF file, URL, or
+SPARQL-endpoint (option C<--sparql>) to JSKOS format (SKOS in JSON-LD). On
+success the following files are created in normalized JSON:
+
+=over
+
+=item scheme.json
+
+JSKOS description of the concept scheme
+
+=item concepts.json
+
+JKSOS description of all concepts
+
+=back
+
+Location and name of the files can be controlled with options C<--directory>
+and C<--name>.
+
+All concepts MUST be linked from the concept scheme via C<skos:inScheme>.
+
+Conversion is not optimized for speed so be patient!
+
+=head1 OPTIONS
+
+=over
+
+=item --directory | -d
+
+Output directory to write JSKOS files to. Current directory by default.
+
+=item --name | -n 
+
+Filename prefix to append to exported files. E.g. C<--name foo> will create
+C<foo-scheme.json> and C<foo-concepts.json>.
+
+=item --language | -l
+
+Default language to use for literal values without language (C<en> by default).
+
+=item --quiet | -q
+
+Don't show status messages
+
+=item --verbose | -v
+
+Show detailed processing messages
+
+=item --scheme
+
+Concept scheme URI
+
+=item --sparql
+
+SPARQL endpoint
+
+=item --help | -h | -?
+
+Show usage description
+
+=item --version
+
+Show version of this script
+
+=back
+
+=cut

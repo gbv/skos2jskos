@@ -1,0 +1,7 @@
+*~
+.build/
+App-*
+*.tdy
+*.bak
+*concepts.json
+*scheme.json
