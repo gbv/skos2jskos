@@ -1,7 +1,7 @@
 #!/usr/bin/env perl
 use v5.14;
 
-our $VERSION = '0.1.0';
+our $VERSION = '0.1.1';
 
 use List::Util qw(any);
 
@@ -36,7 +36,7 @@ sub error($) {              ## no critic
 }
 
 sub fatal($) {              ## no critic
-    error(@_);
+    error $_[0];
     exit 1;
 }
 
@@ -46,12 +46,12 @@ sub warning($) {            ## no critic
 
 sub info($) {               ## no critic
     return if $opt{quiet};
-    say STDERR ( $colored ? colored( $_[0], 'green' ) : $_[0] );
+    say( $colored ? colored( $_[0], 'green' ) : $_[0] );
 }
 
 sub trace($) {              ## no critic
     return unless $opt{verbose};
-    say STDERR ( $colored ? colored( $_[0], 'white' ) : $_[0] );
+    say( $colored ? colored( $_[0], 'white' ) : $_[0] );
 }
 
 ## check where to get RDF data from
@@ -86,8 +86,9 @@ sub sparql {
     my ($query) = @_;
 
     $query = <<'SPARQL'. $query . "\n}";
-PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
 PREFIX dct: <http://purl.org/dc/terms/>
+PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+PREFIX vann: <http://purl.org/vocab/vann/> 
 SELECT * WHERE {
 SPARQL
 
@@ -164,8 +165,19 @@ my $scheme = {
     type       => ['http://www.w3.org/2004/02/skos/core#ConceptScheme'],
 };
 
-my $res = sparql("<$opt{scheme}> dct:title ?t .");
-$res->each( sub { prefLabel( $scheme, $_[0]->{t} ) } );
+my $uri = $opt{scheme};
+my $res = sparql(<<SPARQL);
+<$uri> dct:title ?title .
+OPTIONAL { <$uri> skos:notation ?notation } .
+OPTIONAL { <$uri> vann:preferredNamespacePrefix ?notation } .
+SPARQL
+$res->each(
+    sub {
+        my $s = shift;
+        prefLabel( $scheme, $s->{title} );
+        notation( $scheme, $s->{notation} );
+    }
+);
 
 $res = sparql("<$opt{scheme}> skos:hasTopConcept ?c .");
 $res->each( sub { uriList( $scheme, 'topConcepts', $_[0]->{c} ) } );
@@ -189,7 +201,7 @@ my $concepts = {};
 
 # TODO: just all concepts instead of inScheme
 # TODO: broader, altLabel etc.
-my $res = sparql(<<SPARQL);
+$res = sparql(<<SPARQL);
 ?c skos:inScheme <$opt{scheme}> .
 OPTIONAL { ?c skos:prefLabel ?pLabel } .
 OPTIONAL { ?c skos:notation ?notation } .
@@ -203,8 +215,9 @@ $res->each(
         unless ( defined $concepts->{$uri} ) {
             trace "$uri";
             $concepts->{$uri} = {
-                uri  => $uri,
-                type => ['http://www.w3.org/2004/02/skos/core#Concept'],
+                uri      => $uri,
+                type     => ['http://www.w3.org/2004/02/skos/core#Concept'],
+                inScheme => $opt{scheme},
             };
         }
 
@@ -216,7 +229,8 @@ $res->each(
     }
 );
 
-info "Exporting " . scalar( values %$concepts ) . " JSKOS concepts";
+my $count = values %$concepts or warning "No concepts found";
+info "Exporting $count JSKOS concepts";
 export( 'concepts.json', [ map { $concepts->{$_} } sort keys %$concepts ] );
 
 __END__
@@ -231,9 +245,10 @@ skos2jskos - convert SKOS/RDF to JSKOS
 
 =head1 USAGE
 
-This script can be used to convert SKOS data from a local RDF file, URL, or
-SPARQL-endpoint (option C<--sparql>) to JSKOS format (SKOS in JSON-LD). On
-success the following files are created in normalized JSON:
+This script can be used to convert SKOS data from local RDF files, URL, or
+SPARQL-endpoint (option C<--sparql>) to JSKOS format (SKOS in JSON-LD). 
+
+On success the following files are created in normalized JSON:
 
 =over
 
@@ -296,5 +311,9 @@ Show usage description
 Show version of this script
 
 =back
+
+=head1 SEE ALSO
+
+L<App::skos2jskos>, L<https://gbv.github.io/jskos/>
 
 =cut

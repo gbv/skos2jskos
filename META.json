@@ -64,9 +64,6 @@
          "web" : "https://github.com/gbv/skos2jskos"
       }
    },
-   "version" : "0.1.0",
-   "x_contributors" : [
-      "Jakob Voss <voss@gbv.de>"
-   ]
+   "version" : "0.1.1"
 }
 

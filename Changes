@@ -1,6 +1,9 @@
 Revision history for App-skos2jskos
 
 {{$NEXT}}
+    - include vann:preferredNamespacePrefix (concept scheme notation)
+    - include skos:inScheme (concepts)
+    - add tests
 
 0.1.0  2015-11-02 12:50:22 CET
     - First release 
