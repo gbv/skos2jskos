@@ -16,6 +16,12 @@ output_is { run('-v','t/ex/empty.ttl') }
     "no scheme";
 ok $exit, 'error';
 
+output_is { run('t/ex/scheme.ttl','-s','x:y') } 
+    "Reading RDF files\nConverting concept scheme x:y\n",
+    "Concept scheme <x:y> not found or incomplete\n",
+    "not the right scheme";
+ok $exit, 'error';
+
 output_is { run('-v','t/ex/scheme.ttl','-d',$dir) } join("\n", 
         "Reading RDF files",
         "3 triples from t/ex/scheme.ttl",

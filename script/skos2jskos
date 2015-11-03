@@ -1,7 +1,7 @@
 #!/usr/bin/env perl
 use v5.14;
 
-our $VERSION = '0.1.1';
+our $VERSION = '0.1.2';
 
 use List::Util qw(any);
 
@@ -11,7 +11,7 @@ use Pod::Usage;
 
 my %opt;
 GetOptions(
-    \%opt,           'help|h|?', 'sparql=s',     'scheme=s',
+    \%opt,           'help|h|?', 'sparql|q=s',   'scheme|s=s',
     'directory|d=s', 'name|n=s', 'language|l=s', 'quiet|q',
     'verbose|v',     'version',
 ) or exit 1;
@@ -106,7 +106,10 @@ SPARQL
 sub prefLabel {
     my ( $entity, $label ) = @_;
     return unless $label;
-    my $language = $label->literal_value_language // $opt{language};
+    my $language = $label->literal_value_language // do {
+        warning "missing language tag";
+        $opt{language};
+    };
     my $value = $label->literal_value;
     if ( ( $entity->{prefLabel}->{$language} // $value ) ne $value ) {
         warning "multiple prefLabel\@$language for " . $entity->{uri};
@@ -171,6 +174,10 @@ my $res = sparql(<<SPARQL);
 OPTIONAL { <$uri> skos:notation ?notation } .
 OPTIONAL { <$uri> vann:preferredNamespacePrefix ?notation } .
 SPARQL
+
+fatal "Concept scheme <$uri> not found or incomplete"
+  unless $res->peek;
+
 $res->each(
     sub {
         my $s = shift;
@@ -246,7 +253,8 @@ skos2jskos - convert SKOS/RDF to JSKOS
 =head1 USAGE
 
 This script can be used to convert SKOS data from local RDF files, URL, or
-SPARQL-endpoint (option C<--sparql>) to JSKOS format (SKOS in JSON-LD). 
+SPARQL-endpoint to L<JSKOS format|https://gbv.github.io/jskos/> (SKOS in
+JSON-LD). 
 
 On success the following files are created in normalized JSON:
 
@@ -265,9 +273,13 @@ JKSOS description of all concepts
 Location and name of the files can be controlled with options C<--directory>
 and C<--name>.
 
-All concepts MUST be linked from the concept scheme via C<skos:inScheme>.
-
 Conversion is not optimized for speed so be patient!
+
+=head2 SKOS requirements
+
+The concept scheme MUST have a title (C<dct:title>).
+
+All concepts MUST be linked from the concept scheme via C<skos:inScheme>.
 
 =head1 OPTIONS
 
@@ -294,11 +306,11 @@ Don't show status messages
 
 Show detailed processing messages
 
-=item --scheme
+=item --scheme | -s
 
 Concept scheme URI
 
-=item --sparql
+=item --sparql | -q
 
 SPARQL endpoint
 
@@ -314,6 +326,6 @@ Show version of this script
 
 =head1 SEE ALSO
 
-L<App::skos2jskos>, L<https://gbv.github.io/jskos/>
+L<App::skos2jskos>
 
 =cut
