@@ -1,6 +1,8 @@
 Revision history for App-skos2jskos
 
 {{$NEXT}}
+
+0.1.2  2015-11-03 15:05:34 CET
     - add missing dependency
     - detect wrong --scheme option
 
