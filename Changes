@@ -1,6 +1,8 @@
 Revision history for App-skos2jskos
 
 {{$NEXT}}
+    - include scheme description
+    - remove trailing newline in output (#1)
 
 0.1.2  2015-11-03 15:05:34 CET
     - add missing dependency
