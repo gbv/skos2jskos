@@ -6,4 +6,5 @@
 
 <> a skos:ConceptScheme;
     dct:title "a scheme"@en;
+    dct:description "a scheme for testing"@en;
     vann:preferredNamespacePrefix "example" .

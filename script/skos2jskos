@@ -102,15 +102,19 @@ SPARQL
     $q->execute($source) // RDF::Trine::Iterator->new( [], 'bindings', [] );
 }
 
+sub language {
+    $_[0]->literal_value_language // do {
+        warning "missing language tag";
+        $opt{language};
+    };
+}
+
 ## Conversion methods
 sub prefLabel {
     my ( $entity, $label ) = @_;
     return unless $label;
-    my $language = $label->literal_value_language // do {
-        warning "missing language tag";
-        $opt{language};
-    };
-    my $value = $label->literal_value;
+    my $language = language($label);
+    my $value    = $label->literal_value;
     if ( ( $entity->{prefLabel}->{$language} // $value ) ne $value ) {
         warning "multiple prefLabel\@$language for " . $entity->{uri};
     }
@@ -135,6 +139,18 @@ sub notation {
     pushUnique( $entity->{notation} //= [], $label->literal_value );
 }
 
+sub note {
+    my ( $entity, $note, $type ) = @_;
+    return unless $note;
+    my $language = language($note);
+    my $map      = $entity->{$type} //= {};    # language map of lists
+    my $list     = $map->{$language} //= [];
+    my $string   = $note->literal_value;
+    $string =~ s/^\s+|\s+$//mg;
+    $string = $1 if $string =~ /^"(.+)"$/m;    # BARTOC cleanup
+    pushUnique( $list, $string );
+}
+
 ## Export JSKOS method
 use JSON;
 my $JSON = JSON->new->pretty->utf8->canonical;
@@ -144,7 +160,7 @@ sub export {
     $file = $opt{name} . "-$file" if defined $opt{name};
     $file = $opt{directory} . '/' . $file;
     open my $fh, '>', $file;
-    say $fh $JSON->encode($jskos);
+    print $fh $JSON->encode($jskos);
     trace $file;
 }
 
@@ -173,6 +189,7 @@ my $res = sparql(<<SPARQL);
 <$uri> dct:title ?title .
 OPTIONAL { <$uri> skos:notation ?notation } .
 OPTIONAL { <$uri> vann:preferredNamespacePrefix ?notation } .
+OPTIONAL { <$uri> dct:description ?description } .
 SPARQL
 
 fatal "Concept scheme <$uri> not found or incomplete"
@@ -183,6 +200,7 @@ $res->each(
         my $s = shift;
         prefLabel( $scheme, $s->{title} );
         notation( $scheme, $s->{notation} );
+        note( $scheme, $s->{description}, 'definition' );
     }
 );
 
@@ -194,7 +212,6 @@ $scheme->{topConcepts} = [ sort @{ $scheme->{topConcepts} } ]
 # TODO:
 # - dc:creator, dct:creator
 # - dct:licence
-# - dct:description
 # - notation
 # - altLabel
 

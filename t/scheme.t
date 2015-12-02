@@ -24,7 +24,7 @@ ok $exit, 'error';
 
 output_is { run('-v','t/ex/scheme.ttl','-d',$dir) } join("\n", 
         "Reading RDF files",
-        "3 triples from t/ex/scheme.ttl",
+        "4 triples from t/ex/scheme.ttl",
         "Converting concept scheme http://example.org/",
         "Exporting JSKOS scheme",
         "$dir/scheme.json",
@@ -36,11 +36,12 @@ output_is { run('-v','t/ex/scheme.ttl','-d',$dir) } join("\n",
 ok !$exit, 'ok';
 
 is_deeply slurp_json("$dir/scheme.json"), {
-   '@context' => 'https://gbv.github.io/jskos/context.json',
-   'notation' => ['example'],
-   'prefLabel' => { en => 'a scheme' },
-   'type'     => ['http://www.w3.org/2004/02/skos/core#ConceptScheme'],
-   'uri'      => 'http://example.org/',
+   '@context'   => 'https://gbv.github.io/jskos/context.json',
+   'notation'   => ['example'],
+   'prefLabel'  => { en => 'a scheme' },
+   'type'       => ['http://www.w3.org/2004/02/skos/core#ConceptScheme'],
+   'uri'        => 'http://example.org/',
+   'definition' => { en => ['a scheme for testing'] },
 }, 'converted scheme';
 
 done_testing;
