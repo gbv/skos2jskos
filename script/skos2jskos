@@ -127,10 +127,16 @@ sub pushUnique {
     push @$list, $value;
 }
 
-sub uriList {
+sub pushUniqueUri {
+    my ( $list, $value ) = @_;
+    return if any { $_->{uri} eq $value } @$list;
+    push @$list, { uri => $value };
+}
+
+sub uriSet {
     my ( $entity, $property, $node ) = @_;
     return unless $node;
-    pushUnique( $entity->{$property} //= [], $node->uri_value );
+    pushUniqueUri( $entity->{$property} //= [], $node->uri_value );
 }
 
 sub notation {
@@ -205,7 +211,7 @@ $res->each(
 );
 
 $res = sparql("<$opt{scheme}> skos:hasTopConcept ?c .");
-$res->each( sub { uriList( $scheme, 'topConcepts', $_[0]->{c} ) } );
+$res->each( sub { uriSet( $scheme, 'topConcepts', $_[0]->{c} ) } );
 $scheme->{topConcepts} = [ sort @{ $scheme->{topConcepts} } ]
   if $scheme->{topConcepts};
 
@@ -241,7 +247,7 @@ $res->each(
             $concepts->{$uri} = {
                 uri      => $uri,
                 type     => ['http://www.w3.org/2004/02/skos/core#Concept'],
-                inScheme => $opt{scheme},
+                inScheme => [ $opt{scheme} ],
             };
         }
 
@@ -249,7 +255,7 @@ $res->each(
 
         notation( $concept, $row->{notation} );
         prefLabel( $concept, $row->{pLabel} );
-        uriList( $concept, 'narrower', $row->{narrower} );
+        uriSet( $concept, 'narrower', $row->{narrower} );
     }
 );
 
@@ -271,7 +277,8 @@ skos2jskos - convert SKOS/RDF to JSKOS
 
 This script can be used to convert SKOS data from local RDF files, URL, or
 SPARQL-endpoint to L<JSKOS format|https://gbv.github.io/jskos/> (SKOS in
-JSON-LD). 
+JSON-LD). The script is aligned with JSKOS 0.1.0 but it does not cover all
+possible fields yet.
 
 On success the following files are created in normalized JSON:
 
