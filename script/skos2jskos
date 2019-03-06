@@ -13,7 +13,7 @@ my %opt;
 GetOptions(
     \%opt,           'help|h|?', 'sparql|q=s',   'scheme|s=s',
     'directory|d=s', 'name|n=s', 'language|l=s', 'quiet|q',
-    'verbose|v',     'version',
+    'verbose|v',     'debug',    'version',
 ) or exit 1;
 say "skos2jskos $VERSION" and exit if $opt{version};
 if ( $opt{help} or ( !$opt{sparql} && !@ARGV ) ) {
@@ -26,6 +26,7 @@ die "output directory not found: " . $opt{directory} . "\n"
   unless -d $opt{directory};
 
 $opt{language} //= 'en';
+$opt{verbose} = 2 if $opt{debug};
 
 ## Logging methods
 use Term::ANSIColor;
@@ -49,9 +50,14 @@ sub info($) {               ## no critic
     say( $colored ? colored( $_[0], 'green' ) : $_[0] );
 }
 
-sub trace($) {              ## no critic
+sub debug($) {              ## no critic
     return unless $opt{verbose};
     say( $colored ? colored( $_[0], 'white' ) : $_[0] );
+}
+
+sub trace($) {              ## no critic
+    return unless $opt{verbose} > 1;
+    say $_[0];
 }
 
 ## check where to get RDF data from
@@ -68,7 +74,7 @@ elsif ( $ARGV[0] =~ qr{^https?://} ) {
     info "Reading RDF from $ARGV[0]";
     RDF::Trine->default_useragent->ssl_opts( verify_hostname => 0 );
     RDF::Trine::Parser->parse_url_into_model( $ARGV[0], $source );
-    trace $source->size . " triples";
+    debug $source->size . " triples";
 }
 else {
     info "Reading RDF files";
@@ -76,7 +82,7 @@ else {
     foreach my $file (@ARGV) {
         my $parser = RDF::Trine::Parser->guess_parser_by_filename($file);
         $parser->parse_file_into_model( "file://$file", $file, $source );
-        trace $source->size - $size . " triples from $file";
+        debug $source->size - $size . " triples from $file";
         $size = $source->size;
     }
 }
@@ -92,7 +98,7 @@ PREFIX vann: <http://purl.org/vocab/vann/>
 SELECT * WHERE {
 SPARQL
 
-    #    trace $query;
+    trace $query;
 
     my $q =
       $opt{sparql}
@@ -167,7 +173,7 @@ sub export {
     $file = $opt{directory} . '/' . $file;
     open my $fh, '>', $file;
     print $fh $JSON->encode($jskos);
-    trace $file;
+    debug $file;
 }
 
 ## convert concept scheme
@@ -215,6 +221,8 @@ $res->each( sub { uriSet( $scheme, 'topConcepts', $_[0]->{c} ) } );
 $scheme->{topConcepts} = [ sort @{ $scheme->{topConcepts} } ]
   if $scheme->{topConcepts};
 
+debug "Found " . @{ $scheme->{topConcepts} || [] } . " explicit top concepts";
+
 # TODO:
 # - dc:creator, dct:creator
 # - dct:licence
@@ -243,7 +251,7 @@ $res->each(
         my $uri = $row->{c}->uri_value;
 
         unless ( defined $concepts->{$uri} ) {
-            trace "$uri";
+            debug "$uri";
             $concepts->{$uri} = {
                 uri      => $uri,
                 type     => ['http://www.w3.org/2004/02/skos/core#Concept'],
@@ -329,6 +337,10 @@ Don't show status messages
 =item --verbose | -v
 
 Show detailed processing messages
+
+=item --debug
+
+Show more detailed processing information
 
 =item --scheme | -s
 
