@@ -4,6 +4,8 @@ use v5.14;
 our $VERSION = '0.1.4';
 
 use List::Util qw(any);
+use JSON;
+my $JSON = JSON->new->pretty->utf8->canonical;
 
 ## get options
 use Getopt::Long;
@@ -127,9 +129,18 @@ sub prefLabel {
     $entity->{prefLabel}->{$language} = $value;
 }
 
+sub equal {
+    my ( $a, $b ) = @_;
+    return 1 if $a eq $b or $a == $b;
+    if ( 'HASH' eq ref $a && 'HASH' eq ref $b ) {
+        return 1 if ( $a->{uri} && $a->{uri} eq $b->{uri} );
+        return $JSON->encode($a) eq $JSON->encode($b);
+    }
+}
+
 sub pushUnique {
     my ( $list, $value ) = @_;
-    return if any { $_ eq $value } @$list;
+    return if any { equal( $_, $value ) } @$list;
     push @$list, $value;
 }
 
@@ -143,6 +154,15 @@ sub uriSet {
     my ( $entity, $property, $node ) = @_;
     return unless $node;
     pushUniqueUri( $entity->{$property} //= [], $node->uri_value );
+}
+
+sub agent {
+    my ( $entity, $field, $node ) = @_;
+    if ( $node && $node->is_literal ) {
+        my $language = language($node) // 'und';
+        my $agent = { prefLabel => { $language => $node->literal_value } };
+        pushUnique( $entity->{$field} //= [], $agent );
+    }    # TODO: if resource
 }
 
 sub notation {
@@ -164,8 +184,6 @@ sub note {
 }
 
 ## Export JSKOS method
-use JSON;
-my $JSON = JSON->new->pretty->utf8->canonical;
 
 sub export {
     my ( $file, $jskos ) = @_;
@@ -202,6 +220,8 @@ my $res = sparql(<<SPARQL);
 OPTIONAL { <$uri> skos:notation ?notation } .
 OPTIONAL { <$uri> vann:preferredNamespacePrefix ?notation } .
 OPTIONAL { <$uri> dct:description ?description } .
+OPTIONAL { <$uri> dct:creator ?creator } .
+OPTIONAL { <$uri> dct:contributor ?contributor } .
 SPARQL
 
 fatal "Concept scheme <$uri> not found or incomplete"
@@ -213,6 +233,8 @@ $res->each(
         prefLabel( $scheme, $s->{title} );
         notation( $scheme, $s->{notation} );
         note( $scheme, $s->{description}, 'definition' );
+        agent( $scheme, 'creator',     $s->{creator} );
+        agent( $scheme, 'contributor', $s->{contributor} );
     }
 );
 
@@ -222,12 +244,6 @@ $scheme->{topConcepts} = [ sort @{ $scheme->{topConcepts} } ]
   if $scheme->{topConcepts};
 
 debug "Found " . @{ $scheme->{topConcepts} || [] } . " explicit top concepts";
-
-# TODO:
-# - dc:creator, dct:creator
-# - dct:licence
-# - notation
-# - altLabel
 
 info "Exporting JSKOS scheme";
 export( 'scheme.json', $scheme );

@@ -1,6 +1,7 @@
 Revision history for App-skos2jskos
 
 {{$NEXT}}
+    - Add option --debug
 
 0.1.4  2016-03-02 11:55:57 CET
     - Align with JSKOS 0.1.0
