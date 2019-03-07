@@ -1,6 +1,8 @@
 Revision history for App-skos2jskos
 
 {{$NEXT}}
+
+0.1.5  2019-03-07 13:42:16 CET
     - Add option --debug
     - Include creator and contributor in scheme
     - Include scopeNotes in concepts
