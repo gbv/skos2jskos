@@ -258,6 +258,7 @@ my $concepts = {};
 $res = sparql(<<SPARQL);
 ?c skos:inScheme <$opt{scheme}> .
 OPTIONAL { ?c skos:prefLabel ?pLabel } .
+OPTIONAL { ?c skos:scopeNote ?scopeNote } .
 OPTIONAL { ?c skos:notation ?notation } .
 OPTIONAL { ?c skos:narrower ?narrower } .
 SPARQL
@@ -279,6 +280,7 @@ $res->each(
 
         notation( $concept, $row->{notation} );
         prefLabel( $concept, $row->{pLabel} );
+        note( $concept, $row->{scopeNote}, 'scopeNote' );
         uriSet( $concept, 'narrower', $row->{narrower} );
     }
 );
