@@ -272,7 +272,7 @@ $res->each(
             $concepts->{$uri} = {
                 uri      => $uri,
                 type     => ['http://www.w3.org/2004/02/skos/core#Concept'],
-                inScheme => [ $opt{scheme} ],
+                inScheme => [ { uri => $opt{scheme} } ],
             };
         }
 
