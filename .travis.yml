@@ -12,7 +12,7 @@ install:
   - cpanm --quiet --installdeps --notest --force --skip-satisfied .
 env: RELEASE_TESTING=1 AUTOMATED_TESTING=1
 script:
-  - perl Build.PL && ./Build build
+  - perl Build.PL && ./Build build && cover -test
 
 # Report coverage only once
 jobs:
@@ -20,7 +20,7 @@ jobs:
     - stage: deploy
       script:
         - cpanm --quiet --notest --skip-satisfied Devel::Cover Devel::Cover::Report::Coveralls
-        - cover -test
+        - perl Build.PL && ./Build build && cover -test
         - cover -report coveralls
       perl: 5.26
 

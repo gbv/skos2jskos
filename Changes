@@ -1,6 +1,8 @@
 Revision history for App-skos2jskos
 
 {{$NEXT}}
+    - Fix field inScheme
+    - Add missing dependency JSON
 
 0.1.5  2019-03-07 13:42:16 CET
     - Add option --debug
