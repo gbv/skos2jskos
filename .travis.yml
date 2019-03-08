@@ -11,8 +11,6 @@ perl:
 install: 
   - cpanm --quiet --installdeps --notest --force --skip-satisfied .
 env: RELEASE_TESTING=1 AUTOMATED_TESTING=1
-script:
-  - perl Build.PL && ./Build build && cover -test
 
 # Report coverage only once
 jobs:
