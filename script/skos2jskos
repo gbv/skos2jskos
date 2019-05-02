@@ -112,7 +112,7 @@ SPARQL
 
 sub language {
     $_[0]->literal_value_language // do {
-        warning "missing language tag";
+        warning "missing language tag of " . $_[0];
         $opt{language};
     };
 }
@@ -120,7 +120,7 @@ sub language {
 ## Conversion methods
 sub prefLabel {
     my ( $entity, $label ) = @_;
-    return unless $label;
+    return unless isLiteral( $label, 'prefLabel' );
     my $language = language($label);
     my $value    = $label->literal_value;
     if ( ( $entity->{prefLabel}->{$language} // $value ) ne $value ) {
@@ -167,13 +167,25 @@ sub agent {
 
 sub notation {
     my ( $entity, $label ) = @_;
-    return unless $label;
+    return unless isLiteral( $label, 'notation' );
     pushUnique( $entity->{notation} //= [], $label->literal_value );
+}
+
+sub isLiteral {
+    my ( $node, $type ) = @_;
+    return unless $node;
+    if ( $node->is_literal ) {
+        return 1;
+    }
+    else {
+        warn "skipping non-literal $type: $node";
+        return 0;
+    }
 }
 
 sub note {
     my ( $entity, $note, $type ) = @_;
-    return unless $note;
+    return unless isLiteral( $note, $type );
     my $language = language($note);
     my $map      = $entity->{$type} //= {};    # language map of lists
     my $list     = $map->{$language} //= [];
