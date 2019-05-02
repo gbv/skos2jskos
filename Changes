@@ -1,6 +1,8 @@
 Revision history for App-skos2jskos
 
 {{$NEXT}}
+
+0.2.0  2019-05-02 10:57:08 CEST
     - Export concepts in ndjson
     - Detect and warn on non-literals
 
