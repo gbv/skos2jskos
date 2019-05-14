@@ -13,6 +13,10 @@ App::skos2jskos - Convert SKOS/RDF to JSKOS format
 
 See L<skos2jskos> command line script.
 
+=head1 INSTALLATION
+
+  cpanm App::skos2jskos
+
 =head1 AUTHOR
 
 Jakob Voss <voss@gbv.de>
