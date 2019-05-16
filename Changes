@@ -1,6 +1,7 @@
 Revision history for App-skos2jskos
 
 {{$NEXT}}
+    - Remove some tests to avoid installation failure
 
 0.2.0  2019-05-02 10:57:08 CEST
     - Export concepts in ndjson
