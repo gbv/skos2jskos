@@ -282,6 +282,7 @@ OPTIONAL { ?c skos:prefLabel ?pLabel } .
 OPTIONAL { ?c skos:notation ?notation } .
 OPTIONAL { ?c skos:narrower ?narrower } .
 OPTIONAL { ?c skos:broader ?broader } .
+OPTIONAL { ?c skos:topConceptOf ?top } .
 SPARQL
 
 $query = join "\n", $query, map { "OPTIONAL { ?c skos:$_ ?$_ } ." } @noteTypes;
@@ -298,7 +299,8 @@ sparql($query)->each(
                 inScheme => [ { uri => $opt{scheme} } ],
             };
             $concepts->{$uri}{topConceptOf} = $concepts->{$uri}{inScheme}
-                if grep {$_->{uri} eq $uri} @{$scheme->{topConcepts} || []};
+                if ($row->{top} && $row->{top}->uri_value eq $scheme->{uri}) ||
+                   grep {$_->{uri} eq $uri} @{$scheme->{topConcepts} || []};
         }
 
         my $concept = $concepts->{$uri};
