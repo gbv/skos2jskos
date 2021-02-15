@@ -1,6 +1,8 @@
 Revision history for App-skos2jskos
 
 {{$NEXT}}
+
+0.2.3  2021-02-15 11:38:13 CET
     - Add topConceptOf if given at concepts
 
 0.2.2  2021-02-15 11:05:58 CET

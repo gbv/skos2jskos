@@ -3,5 +3,5 @@
 App-*
 *.tdy
 *.bak
-*concepts.json
-*scheme.json
+*concepts.ndjson
+*scheme.ndjson
