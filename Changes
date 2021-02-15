@@ -1,6 +1,8 @@
 Revision history for App-skos2jskos
 
 {{$NEXT}}
+
+0.2.4  2021-02-15 12:37:02 CET
     - Make inScheme optional if topConceptOf is used
 
 0.2.3  2021-02-15 11:38:13 CET
