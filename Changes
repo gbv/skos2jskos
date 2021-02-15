@@ -1,6 +1,7 @@
 Revision history for App-skos2jskos
 
 {{$NEXT}}
+    - Add topConceptOf to concepts
 
 0.2.1  2019-05-16 13:05:33 CEST
     - Remove some tests to avoid installation failure
